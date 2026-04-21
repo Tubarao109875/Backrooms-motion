@@ -1,0 +1,487 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local Settings = {
+    AlmondWater = false,
+    EnergyDrink = false,
+    Lantern = false,
+    Radar = false,
+    RadarPlayer = false,
+    Berretta = false,
+    Revolver357 = false,
+    Glock18 = false,
+    Ak47 = false,
+    Tracers = true,
+    Highlights = true
+}
+local Colors = {
+    ["almond water"] = Color3.fromRGB(255, 245, 180),
+    ["energy drink"] = Color3.fromRGB(0, 170, 255),
+    ["lantern"] = Color3.fromRGB(255, 255, 255),
+    ["radar"] = Color3.fromRGB(144, 238, 144),
+    ["radar player"] = Color3.fromRGB(0, 255, 127),
+    ["berretta"] = Color3.fromRGB(180, 180, 180),
+    ["357"] = Color3.fromRGB(255, 165, 0),
+    ["glock 18"] = Color3.fromRGB(150, 150, 255),
+    ["ak47 rgb"] = Color3.fromRGB(255, 0, 0),
+}
+local KnownItems = {}
+local ESPCache = {}
+
+local function isHeldByPlayer(item)
+    local parent = item.Parent
+    if parent and parent:FindFirstChildWhichIsA("Humanoid") and game.Players:GetPlayerFromCharacter(parent) then
+        return true
+    end
+    if parent and parent.Parent and parent.Parent:FindFirstChildWhichIsA("Humanoid") and game.Players:GetPlayerFromCharacter(parent.Parent) then
+        return true
+    end
+    return false
+end
+
+local function checkMatch(obj)
+    local str = string.lower(obj.Name)
+    if string.find(str, "almond water") or string.find(str, "almond") then return "almond water" end
+    if string.find(str, "energy drink") or string.find(str, "energy") then return "energy drink" end
+    if string.find(str, "lantern") or string.find(str, "lanter") then return "lantern" end
+    if string.find(str, "radar player") then return "radar player" end
+    if string.find(str, "radar") then return "radar" end
+    if string.find(str, "berretta") or string.find(str, "m9") then return "berretta" end
+    if string.find(str, "357") or string.find(str, "revolver") then return "357" end
+    if string.find(str, "glock") or string.find(str, "g18") or string.find(str, "pistol") then return "glock 18" end
+    if string.find(str, "ak47") or string.find(str, "ak-47") then return "ak47 rgb" end
+    return nil
+end
+
+local function getBeautifulName(typ)
+    local names = {
+        ["almond water"] = "Almond Water",
+        ["energy drink"] = "Energy Drink",
+        ["lantern"] = "Lantern",
+        ["radar"] = "Radar",
+        ["radar player"] = "Radar Player",
+        ["berretta"] = "Berretta",
+        ["357"] = ".357 Revolver",
+        ["glock 18"] = "Glock 18",
+        ["ak47 rgb"] = "AK-47 RGB"
+    }
+    return names[typ] or "Unknown"
+end
+
+local function getRoot(obj)
+    if obj:IsA("BasePart") then
+        return obj
+    end
+    if obj:IsA("Model") then
+        return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return nil
+end
+
+local function createESP(obj, typ)
+    if ESPCache[obj] then return end
+    local root = getRoot(obj)
+    if not root then return end
+    local color = Colors[typ] or Color3.new(1,1,1)
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "ESP"
+    gui.Size = UDim2.new(0, 160, 0, 50)
+    gui.AlwaysOnTop = true
+    gui.StudsOffset = Vector3.new(0, 2.5, 0)
+    gui.Parent = root
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,1,0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = color
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Parent = gui
+    Instance.new("UIStroke", label).Thickness = 1.5
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = obj
+    highlight.FillColor = color
+    highlight.OutlineColor = Color3.new(1,1,1)
+    highlight.FillTransparency = 0.4
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = Settings.Highlights
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Thickness = 1.5
+    line.Transparency = 0.8
+    line.Color = color
+    ESPCache[obj] = {
+        gui = gui,
+        label = label,
+        root = root,
+        line = line,
+        highlight = highlight,
+        name = getBeautifulName(typ),
+        type = typ
+    }
+end
+
+local function removeESP(obj)
+    if ESPCache[obj] then
+        local e = ESPCache[obj]
+        if e.gui then e.gui:Destroy() end
+        if e.highlight then e.highlight:Destroy() end
+        if e.line then
+            e.line.Visible = false
+            e.line:Remove()
+        end
+        ESPCache[obj] = nil
+    end
+end
+
+local function updateESPType(typ, isEnabled)
+    for obj, objType in pairs(KnownItems) do
+        if objType == typ then
+            if isEnabled then
+                if typ == "ak47 rgb" and isHeldByPlayer(obj) then
+                else
+                    createESP(obj, typ)
+                end
+            else
+                removeESP(obj)
+            end
+        end
+    end
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "Tuba super menu👑 (only for tuba)",
+    LoadingTitle = "Scanning..."
+})
+
+-- Aba de ESP
+local Tab = Window:CreateTab("ESP", 4483362458)
+Tab:CreateSection("Visuals")
+Tab:CreateToggle({Name = "Highlights", CurrentValue = true, Callback = function(v) Settings.Highlights = v; for _, e in pairs(ESPCache) do if e.highlight then e.highlight.Enabled = v end end end})
+Tab:CreateToggle({Name = "Tracers", CurrentValue = true, Callback = function(v) Settings.Tracers = v end})
+Tab:CreateSection("Items")
+Tab:CreateToggle({Name="Almond Water", Callback=function(v) Settings.AlmondWater=v; updateESPType("almond water", v) end})
+Tab:CreateToggle({Name="Energy Drink", Callback=function(v) Settings.EnergyDrink=v; updateESPType("energy drink", v) end})
+Tab:CreateToggle({Name="Lantern", Callback=function(v) Settings.Lantern=v; updateESPType("lantern", v) end})
+Tab:CreateToggle({Name="Radar", Callback=function(v) Settings.Radar=v; updateESPType("radar", v) end})
+Tab:CreateToggle({Name="Radar Player", Callback=function(v) Settings.RadarPlayer=v; updateESPType("radar player", v) end})
+Tab:CreateToggle({Name="Berretta", Callback=function(v) Settings.Berretta=v; updateESPType("berretta", v) end})
+Tab:CreateToggle({Name=".357", Callback=function(v) Settings.Revolver357=v; updateESPType("357", v) end})
+Tab:CreateToggle({Name="Glock 18", Callback=function(v) Settings.Glock18=v; updateESPType("glock 18", v) end})
+Tab:CreateToggle({Name="AK-47 RGB", Callback=function(v) Settings.Ak47=v; updateESPType("ak47 rgb", v) end})
+
+-- Aba de Misc
+local MiscTab = Window:CreateTab("misc")
+MiscTab:CreateButton({
+    Name = "anti afk",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/evxncodes/mainroblox/main/anti-afk", true))()
+    end
+})
+MiscTab:CreateButton({
+    Name = "rejoin",
+    Callback = function()
+        local ts = game:GetService("TeleportService")
+        local p = game:GetService("Players").LocalPlayer
+        ts:Teleport(game.PlaceId, p)
+    end
+})
+MiscTab:CreateButton({
+    Name = "server hop",
+    Callback = function()
+        local module = loadstring(game:HttpGet("https://raw.githubusercontent.com/LeoKholYt/roblox/main/lk_serverhop.lua"))()
+        module:Teleport(game.PlaceId)
+    end
+})
+
+-- Aba de Exploits Globais
+local ExploitsTab = Window:CreateTab("Exploits Global")
+ExploitsTab:CreateButton({
+    Name = "Infinite yield",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end
+})
+ExploitsTab:CreateButton({
+    Name = "Remote SPY",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Klinac/scripts/main/utopia_spy.lua", true))()
+    end
+})
+ExploitsTab:CreateButton({
+    Name = "Ghost hub (basic one)",
+    Callback = function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Ghost-Hub-85092"))()
+    end
+})
+
+-- [INÍCIO DAS MODIFICAÇÕES] Aba do Player
+local PlayerTab = Window:CreateTab("Player")
+
+-- Variáveis para controlar os loops de velocidade
+local speedLoopConnection = nil
+local staminaToggle, infSpeedToggle, energySpeedToggle -- Variáveis para os objetos de toggle
+
+-- Função para parar qualquer loop de velocidade e resetar para o padrão
+local function stopSpeedLoop()
+    if speedLoopConnection then
+        speedLoopConnection:Disconnect()
+        speedLoopConnection = nil
+    end
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+        if humanoid and humanoid.WalkSpeed ~= 10 then
+            humanoid.WalkSpeed = 10
+        end
+    end
+end
+
+-- Função para iniciar o loop com uma velocidade específica
+local function startSpeedLoop(speed)
+    stopSpeedLoop() -- Garante que nenhum outro loop esteja rodando
+    speedLoopConnection = RunService.RenderStepped:Connect(function()
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+            if humanoid and humanoid.WalkSpeed ~= speed then
+                humanoid.WalkSpeed = speed
+            end
+        end
+    end)
+end
+
+-- Criação dos Toggles de Velocidade
+staminaToggle = PlayerTab:CreateToggle({
+    Name = "inf stamina",
+    CurrentValue = false,
+    Callback = function(isToggledOn)
+        if isToggledOn then
+            infSpeedToggle:Set(false)
+            energySpeedToggle:Set(false)
+            startSpeedLoop(20)
+        else
+            stopSpeedLoop()
+        end
+    end
+})
+
+infSpeedToggle = PlayerTab:CreateToggle({
+    Name = "inf speed(energy drink version speed 16)",
+    CurrentValue = false,
+    Callback = function(isToggledOn)
+        if isToggledOn then
+            staminaToggle:Set(false)
+            energySpeedToggle:Set(false)
+            startSpeedLoop(26)
+        else
+            stopSpeedLoop()
+        end
+    end
+})
+
+energySpeedToggle = PlayerTab:CreateToggle({
+    Name = "energy drink speed(13)",
+    CurrentValue = false,
+    Callback = function(isToggledOn)
+        if isToggledOn then
+            staminaToggle:Set(false)
+            infSpeedToggle:Set(false)
+            startSpeedLoop(13)
+        else
+            stopSpeedLoop()
+        end
+    end
+})
+
+-- Botão de Fullbright
+PlayerTab:CreateButton({
+    Name = "fullbright(only turn off with rejoin)",
+    Callback = function()
+        if not _G.FullBrightExecuted then
+            _G.FullBrightEnabled = false
+            _G.NormalLightingSettings = {
+                Brightness = game:GetService("Lighting").Brightness,
+                ClockTime = game:GetService("Lighting").ClockTime,
+                FogEnd = game:GetService("Lighting").FogEnd,
+                GlobalShadows = game:GetService("Lighting").GlobalShadows,
+                Ambient = game:GetService("Lighting").Ambient
+            }
+            game:GetService("Lighting"):GetPropertyChangedSignal("Brightness"):Connect(function()
+                if game:GetService("Lighting").Brightness ~= 1 and game:GetService("Lighting").Brightness ~= _G.NormalLightingSettings.Brightness then
+                    _G.NormalLightingSettings.Brightness = game:GetService("Lighting").Brightness
+                    if not _G.FullBrightEnabled then
+                        repeat
+                            wait()
+                        until _G.FullBrightEnabled
+                    end
+                    game:GetService("Lighting").Brightness = 1
+                end
+            end)
+            game:GetService("Lighting"):GetPropertyChangedSignal("ClockTime"):Connect(function()
+                if game:GetService("Lighting").ClockTime ~= 12 and game:GetService("Lighting").ClockTime ~= _G.NormalLightingSettings.ClockTime then
+                    _G.NormalLightingSettings.ClockTime = game:GetService("Lighting").ClockTime
+                    if not _G.FullBrightEnabled then
+                        repeat
+                            wait()
+                        until _G.FullBrightEnabled
+                    end
+                    game:GetService("Lighting").ClockTime = 12
+                end
+            end)
+            game:GetService("Lighting"):GetPropertyChangedSignal("FogEnd"):Connect(function()
+                if game:GetService("Lighting").FogEnd ~= 786543 and game:GetService("Lighting").FogEnd ~= _G.NormalLightingSettings.FogEnd then
+                    _G.NormalLightingSettings.FogEnd = game:GetService("Lighting").FogEnd
+                    if not _G.FullBrightEnabled then
+                        repeat
+                            wait()
+                        until _G.FullBrightEnabled
+                    end
+                    game:GetService("Lighting").FogEnd = 786543
+                end
+            end)
+            game:GetService("Lighting"):GetPropertyChangedSignal("GlobalShadows"):Connect(function()
+                if game:GetService("Lighting").GlobalShadows ~= false and game:GetService("Lighting").GlobalShadows ~= _G.NormalLightingSettings.GlobalShadows then
+                    _G.NormalLightingSettings.GlobalShadows = game:GetService("Lighting").GlobalShadows
+                    if not _G.FullBrightEnabled then
+                        repeat
+                            wait()
+                        until _G.FullBrightEnabled
+                    end
+                    game:GetService("Lighting").GlobalShadows = false
+                end
+            end)
+            game:GetService("Lighting"):GetPropertyChangedSignal("Ambient"):Connect(function()
+                if game:GetService("Lighting").Ambient ~= Color3.fromRGB(178, 178, 178) and game:GetService("Lighting").Ambient ~= _G.NormalLightingSettings.Ambient then
+                    _G.NormalLightingSettings.Ambient = game:GetService("Lighting").Ambient
+                    if not _G.FullBrightEnabled then
+                        repeat
+                            wait()
+                        until _G.FullBrightEnabled
+                    end
+                    game:GetService("Lighting").Ambient = Color3.fromRGB(178, 178, 178)
+                end
+            end)
+            game:GetService("Lighting").Brightness = 1
+            game:GetService("Lighting").ClockTime = 12
+            game:GetService("Lighting").FogEnd = 786543
+            game:GetService("Lighting").GlobalShadows = false
+            game:GetService("Lighting").Ambient = Color3.fromRGB(178, 178, 178)
+            local LatestValue = true
+            spawn(function()
+                repeat
+                    wait()
+                until _G.FullBrightEnabled
+                while wait() do
+                    if _G.FullBrightEnabled ~= LatestValue then
+                        if not _G.FullBrightEnabled then
+                            game:GetService("Lighting").Brightness = _G.NormalLightingSettings.Brightness
+                            game:GetService("Lighting").ClockTime = _G.NormalLightingSettings.ClockTime
+                            game:GetService("Lighting").FogEnd = _G.NormalLightingSettings.FogEnd
+                            game:GetService("Lighting").GlobalShadows = _G.NormalLightingSettings.GlobalShadows
+                            game:GetService("Lighting").Ambient = _G.NormalLightingSettings.Ambient
+                        else
+                            game:GetService("Lighting").Brightness = 1
+                            game:GetService("Lighting").ClockTime = 12
+                            game:GetService("Lighting").FogEnd = 786543
+                            game:GetService("Lighting").GlobalShadows = false
+                            game:GetService("Lighting").Ambient = Color3.fromRGB(178, 178, 178)
+                        end
+                        LatestValue = not LatestValue
+                    end
+                end
+            end)
+        end
+        _G.FullBrightExecuted = true
+        _G.FullBrightEnabled = not _G.FullBrightEnabled
+    end
+})
+-- [FIM DAS MODIFICAÇÕES]
+
+-- Loop de Renderização
+RunService.RenderStepped:Connect(function()
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    for obj, data in pairs(ESPCache) do
+        if not obj or not obj.Parent or not KnownItems[obj] then
+            removeESP(obj)
+            continue
+        end
+        if data.type == "ak47 rgb" and isHeldByPlayer(obj) then
+            removeESP(obj)
+            continue
+        end
+        local root = data.root
+        if not root or not root.Parent then
+            removeESP(obj)
+            continue
+        end
+        
+        if data.type == "ak47 rgb" then
+            local hue = (tick() * 0.5) % 1
+            local rgbColor = Color3.fromHSV(hue, 1, 1)
+            data.line.Color = rgbColor
+            data.label.TextColor3 = rgbColor
+            if data.highlight then
+                data.highlight.FillColor = rgbColor
+            end
+        end
+        
+        local pos, onScreen = camera:WorldToViewportPoint(root.Position)
+        if hrp then
+            local dist = math.floor((hrp.Position - root.Position).Magnitude)
+            data.label.Text = data.name .. "\n["..dist.."m]"
+        end
+        if onScreen and Settings.Tracers then
+            data.line.From = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
+            data.line.To = Vector2.new(pos.X, pos.Y)
+            data.line.Visible = true
+        else
+            data.line.Visible = false
+        end
+    end
+end)
+
+-- Funções de Scan
+local function scanObject(obj)
+    local typ = checkMatch(obj)
+    if typ then
+        if typ == "ak47 rgb" and isHeldByPlayer(obj) then
+            return
+        end
+        KnownItems[obj] = typ
+        local isActive = false
+        if typ == "almond water" then isActive = Settings.AlmondWater
+        elseif typ == "energy drink" then isActive = Settings.EnergyDrink
+        elseif typ == "lantern" then isActive = Settings.Lantern
+        elseif typ == "radar" then isActive = Settings.Radar
+        elseif typ == "radar player" then isActive = Settings.RadarPlayer
+        elseif typ == "berretta" then isActive = Settings.Berretta
+        elseif typ == "357" then isActive = Settings.Revolver357
+        elseif typ == "glock 18" then isActive = Settings.Glock18
+        elseif typ == "ak47 rgb" then isActive = Settings.Ak47
+        end
+        if isActive then
+            createESP(obj, typ)
+        end
+    end
+end
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+    scanObject(obj)
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+    task.delay(0.5, function()
+        if obj and obj.Parent then
+            scanObject(obj)
+        end
+    end)
+end)
+
+workspace.DescendantRemoving:Connect(function(obj)
+    if KnownItems[obj] then
+        KnownItems[obj] = nil
+        removeESP(obj)
+    end
+end)
