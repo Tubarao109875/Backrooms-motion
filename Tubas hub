@@ -268,7 +268,7 @@ staminaToggle = PlayerTab:CreateToggle({
 })
 
 infSpeedToggle = PlayerTab:CreateToggle({
-    Name = "inf speed(energy drink version speed 16)",
+    Name = "inf speed(energy drink version speed 26)",
     CurrentValue = false,
     Callback = function(isToggledOn)
         if isToggledOn then
